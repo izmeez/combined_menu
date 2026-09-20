@@ -1,0 +1,189 @@
+/**
+ * @file
+ * Presentation for the Combined menu block.
+ *
+ * The module supplies the structural layout needed for a combined
+ * navigation. Themes remain responsible for colors, typography, and
+ * breakpoint choices.
+ */
+
+.combined-menu {
+  position: relative;
+}
+
+/**
+ * The navigation must retain the .menu class because Backdrop's menu-toggle
+ * library uses it to show and hide the combined navigation.
+ */
+.combined-menu__navigation {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+/**
+ * Desktop: search and account are one row at the right; primary is below.
+ * Floats are intentional here because they also work with themes whose menu
+ * styles are float-based.
+ */
+@media (min-width: 48em) {
+  .combined-menu__search {
+    float: right;
+    margin: 0;
+  }
+
+  .combined-menu__account {
+    float: right;
+    margin: 0 1em 0 0;
+  }
+
+  .combined-menu__primary {
+    clear: both;
+  }
+
+  .combined-menu__search form {
+    display: flex !important;
+    flex-flow: row nowrap !important;
+    align-items: center;
+    margin: 0;
+  }
+
+  .combined-menu__search form > .form-item,
+  .combined-menu__search form > .form-actions {
+    float: none !important;
+    display: block;
+    margin-top: 0;
+    margin-bottom: 0;
+  }
+
+  .combined-menu__search form > .form-item {
+    flex: 1 1 auto;
+    min-width: 12em;
+  }
+
+  .combined-menu__search form > .form-actions {
+    flex: 0 0 auto;
+    margin-left: 0.25em;
+  }
+
+  .combined-menu__search input[type="search"],
+  .combined-menu__search input[type="text"] {
+    width: auto;
+    box-sizing: border-box;
+  }
+
+  .combined-menu__account > .menu,
+  .combined-menu__primary > .menu {
+    margin-top: 0;
+    margin-bottom: 0;
+  }
+
+  .combined-menu__account > .menu {
+    display: flex;
+    flex-flow: row nowrap;
+    align-items: center;
+    margin-left: 0;
+    padding-left: 0;
+    list-style: none;
+  }
+
+  .combined-menu__primary > .menu {
+    display: flex;
+    flex-flow: row wrap;
+    align-items: center;
+    margin-left: 0;
+    padding-left: 0;
+    list-style: none;
+  }
+}
+
+/**
+ * Narrow screens: search, account, then primary.
+ * Backdrop's menu-toggle library controls whether this navigation is shown.
+ */
+@media (max-width: 47.999em) {
+  .combined-menu__search,
+  .combined-menu__account,
+  .combined-menu__primary {
+    float: none;
+    clear: both;
+    width: auto;
+    margin: 0;
+  }
+
+  .combined-menu__search form {
+    display: flex !important;
+    flex-flow: row nowrap !important;
+    align-items: center;
+    width: 100%;
+    margin: 0;
+  }
+
+  .combined-menu__search form > .form-item,
+  .combined-menu__search form > .form-actions {
+    float: none !important;
+    display: block;
+    margin-top: 0;
+    margin-bottom: 0;
+  }
+
+  .combined-menu__search form > .form-item {
+    flex: 1 1 auto;
+    min-width: 0;
+  }
+
+  .combined-menu__search form > .form-actions {
+    flex: 0 0 auto;
+    margin-left: 0.25em;
+  }
+
+  .combined-menu__search input[type="search"],
+  .combined-menu__search input[type="text"] {
+    width: 100%;
+    min-width: 0;
+    box-sizing: border-box;
+  }
+
+  .combined-menu__account > .menu {
+    display: flex;
+    flex-flow: row wrap;
+    align-items: center;
+    margin-left: 0;
+    padding-left: 0;
+    list-style: none;
+  }
+
+  .combined-menu__primary > .menu {
+    display: block;
+    margin-left: 0;
+    padding-left: 0;
+    list-style: none;
+  }
+}
+
+/**
+ * Search submit control. The text remains available to assistive technology;
+ * the visible control is represented by the background icon.
+ */
+.combined-menu__search-button {
+  width: 2.5em;
+  min-width: 2.5em;
+  height: 2.5em;
+  padding: 0;
+  overflow: hidden;
+  text-indent: -9999px;
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24'%3E%3Ccircle cx='10.5' cy='10.5' r='6.5' fill='none' stroke='%23fff' stroke-width='2'/%3E%3Cpath d='M15.5 15.5L21 21' fill='none' stroke='%23fff' stroke-width='2' stroke-linecap='round'/%3E%3C/svg%3E");
+  background-position: center;
+  background-repeat: no-repeat;
+  background-size: 1.1em 1.1em;
+}
+
+/**
+ * Do not let the navigation wrapper's .menu class impose a list layout on
+ * the three combined sections.
+ */
+.combined-menu__navigation > .combined-menu__search,
+.combined-menu__navigation > .combined-menu__account,
+.combined-menu__navigation > .combined-menu__primary {
+  list-style: none;
+}

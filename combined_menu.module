@@ -1,0 +1,343 @@
+<?php
+/**
+ * @file
+ * Provides a combined navigation block.
+ */
+
+/**
+ * Implements hook_block_info().
+ */
+function combined_menu_block_info() {
+  $blocks['combined_menu'] = array(
+    'info' => t('Combined menu'),
+    'cache' => BACKDROP_NO_CACHE,
+  );
+  return $blocks;
+}
+
+/**
+ * Implements hook_block_configure().
+ */
+function combined_menu_block_configure($delta = '', $settings = array()) {
+  module_load_include('inc', 'system', 'system.menu');
+  $settings += combined_menu_block_defaults();
+  $form = array();
+
+  $form['primary'] = array(
+    '#type' => 'fieldset',
+    '#title' => t('Primary menu'),
+  );
+  $form['primary']['primary_menu'] = array(
+    '#type' => 'select',
+    '#title' => t('Menu'),
+    '#options' => combined_menu_menu_options(),
+    '#default_value' => $settings['primary_menu'],
+  );
+  $form['primary'] += combined_menu_menu_form($settings, 'primary');
+
+  $form['account'] = array(
+    '#type' => 'fieldset',
+    '#title' => t('Account menu'),
+  );
+  $form['account']['account_menu'] = array(
+    '#type' => 'select',
+    '#title' => t('Menu'),
+    '#options' => combined_menu_menu_options(),
+    '#default_value' => $settings['account_menu'],
+  );
+  $form['account'] += combined_menu_menu_form($settings, 'account');
+
+  $form['navigation'] = array(
+    '#type' => 'fieldset',
+    '#title' => t('Combined navigation'),
+  );
+  $form['navigation']['toggle'] = array(
+    '#type' => 'checkbox',
+    '#title' => t('Display menu toggle button on small screens'),
+    '#default_value' => $settings['toggle'],
+    '#description' => t('On small screens, the combined search, account, and primary navigation is hidden behind one menu toggle.'),
+  );
+  $form['navigation']['toggle_text'] = array(
+    '#type' => 'textfield',
+    '#title' => t('Toggle button text'),
+    '#default_value' => $settings['toggle_text'],
+    '#description' => t('Text displayed beside the hamburger button.'),
+    '#states' => array(
+      'visible' => array(
+        'input[name="block_settings[toggle]"]' => array('checked' => TRUE),
+      ),
+    ),
+  );
+
+  $form['search'] = array(
+    '#type' => 'fieldset',
+    '#title' => t('Search'),
+  );
+  $form['search']['search_enabled'] = array(
+    '#type' => 'checkbox',
+    '#title' => t('Show search'),
+    '#default_value' => $settings['search_enabled'],
+  );
+  $form['search']['search_placeholder'] = array(
+    '#type' => 'textfield',
+    '#title' => t('Search field placeholder'),
+    '#default_value' => $settings['search_placeholder'],
+    '#states' => array(
+      'visible' => array(
+        'input[name="block_settings[search_enabled]"]' => array('checked' => TRUE),
+      ),
+    ),
+  );
+  $form['search']['search_button_label'] = array(
+    '#type' => 'textfield',
+    '#title' => t('Search button label'),
+    '#default_value' => $settings['search_button_label'],
+    '#description' => t('Accessible text for the search button.'),
+    '#states' => array(
+      'visible' => array(
+        'input[name="block_settings[search_enabled]"]' => array('checked' => TRUE),
+      ),
+    ),
+  );
+
+  return $form;
+}
+
+/**
+ * Implements hook_block_view().
+ */
+function combined_menu_block_view($delta = '', $settings = array(), $contexts = array()) {
+  module_load_include('inc', 'system', 'system.menu');
+  $settings += combined_menu_block_defaults();
+
+  $block = array();
+  $block['subject'] = '';
+
+  $navigation = array(
+    '#type' => 'container',
+    '#attributes' => array(
+      'class' => array('menu', 'combined-menu__navigation'),
+    ),
+  );
+
+  if (!empty($settings['search_enabled'])) {
+    $navigation['search'] = array(
+      '#type' => 'container',
+      '#attributes' => array(
+        'class' => array('combined-menu__search'),
+      ),
+      'content' => combined_menu_search($settings),
+    );
+  }
+
+  $account = combined_menu_build_menu($settings, 'account');
+  if (!empty($account['content'])) {
+    $navigation['account'] = array(
+      '#type' => 'container',
+      '#attributes' => array(
+        'class' => array('combined-menu__account'),
+      ),
+      'content' => $account['content'],
+    );
+  }
+
+  $primary = combined_menu_build_menu($settings, 'primary');
+  if (!empty($primary['content'])) {
+    $navigation['primary'] = array(
+      '#type' => 'container',
+      '#attributes' => array(
+        'class' => array('combined-menu__primary'),
+      ),
+      'content' => $primary['content'],
+    );
+  }
+
+  $content = array(
+    '#type' => 'container',
+    '#attributes' => array(
+      'class' => array('combined-menu'),
+    ),
+  );
+
+  if (!empty($settings['toggle'])) {
+    $id = backdrop_html_id('combined-menu-toggle-state');
+    $content['toggle'] = array(
+      '#markup' => theme('menu_toggle', array(
+        'enabled' => TRUE,
+        'id' => $id,
+        'text' => t(trim($settings['toggle_text'])),
+      )),
+    );
+    $navigation['#attached']['library'][] = array(
+      'system',
+      'backdrop.menu-toggle',
+    );
+  }
+
+  $content['navigation'] = $navigation;
+  $content['#attached']['css'][] = backdrop_get_path('module', 'combined_menu') . '/css/combined_menu.css';
+  $block['content'] = $content;
+  return $block;
+}
+
+/**
+ * Returns the default block configuration.
+ *
+ * @return array
+ *   The default settings.
+ */
+function combined_menu_block_defaults() {
+  module_load_include('inc', 'system', 'system.menu');
+  $primary = system_menu_block_defaults('main-menu');
+  $account = system_menu_block_defaults('user-menu');
+
+  return array(
+    'primary_menu' => $primary['menu_name'],
+    'primary_style' => 'top_only',
+    'primary_level' => $primary['level'],
+    'primary_depth' => $primary['depth'],
+    'primary_expand_all' => $primary['expand_all'],
+    'primary_clickdown' => $primary['clickdown'],
+    'primary_collapse' => $primary['collapse'],
+    'primary_accordion' => !empty($primary['accordion']),
+    'account_menu' => $account['menu_name'],
+    'account_style' => 'top_only',
+    'account_level' => $account['level'],
+    'account_depth' => $account['depth'],
+    'account_expand_all' => $account['expand_all'],
+    'account_clickdown' => $account['clickdown'],
+    'account_collapse' => $account['collapse'],
+    'account_accordion' => !empty($account['accordion']),
+    'toggle' => TRUE,
+    'toggle_text' => 'Menu',
+    'search_enabled' => TRUE,
+    'search_placeholder' => 'Enter search terms',
+    'search_button_label' => 'Search',
+  );
+}
+
+/**
+ * Returns the core menu configuration form for one combined menu.
+ *
+ * @param array $settings
+ *   The combined menu block settings.
+ * @param string $type
+ *   Either 'primary' or 'account'.
+ *
+ * @return array
+ *   A menu configuration form fragment.
+ */
+function combined_menu_menu_form(array $settings, $type) {
+  $prefix = $type . '_';
+  $config = array(
+    'menu_name' => $settings[$prefix . 'menu'],
+    'style' => $settings[$prefix . 'style'],
+    'level' => $settings[$prefix . 'level'],
+    'depth' => $settings[$prefix . 'depth'],
+    'expand_all' => $settings[$prefix . 'expand_all'],
+    'toggle' => FALSE,
+    'toggle_text' => 'Menu',
+    'clickdown' => $settings[$prefix . 'clickdown'],
+    'collapse' => $settings[$prefix . 'collapse'],
+    'accordion' => $settings[$prefix . 'accordion'],
+  );
+  $form = system_menu_block_form($config);
+  unset($form['menu_name'], $form['toggle'], $form['toggle_text']);
+
+  foreach ($form as $key => &$element) {
+    $name = $prefix . $key;
+    $element['#parents'] = array('block_settings', $name);
+    if (!empty($element['#states'])) {
+      $element['#states'] = combined_menu_namespace_states($element['#states'], $prefix);
+    }
+  }
+  return $form;
+}
+
+/**
+ * Builds one of the configured menu trees without its own toggle.
+ *
+ * @param array $settings
+ *   The combined menu block settings.
+ * @param string $type
+ *   Either 'primary' or 'account'.
+ *
+ * @return array
+ *   The menu block data.
+ */
+function combined_menu_build_menu(array $settings, $type) {
+  $prefix = $type . '_';
+  $config = array(
+    'menu_name' => $settings[$prefix . 'menu'],
+    'style' => $settings[$prefix . 'style'],
+    'level' => $settings[$prefix . 'level'],
+    'depth' => $settings[$prefix . 'depth'],
+    'expand_all' => $settings[$prefix . 'expand_all'],
+    'toggle' => FALSE,
+    'toggle_text' => 'Menu',
+    'clickdown' => $settings[$prefix . 'clickdown'],
+    'collapse' => $settings[$prefix . 'collapse'],
+    'accordion' => $settings[$prefix . 'accordion'],
+  );
+  return system_menu_block_build($config);
+}
+
+/**
+ * Builds the core search block form for the combined menu.
+ *
+ * @param array $settings
+ *   The combined menu block settings.
+ *
+ * @return array
+ *   A search form render array.
+ */
+function combined_menu_search(array $settings) {
+  $form = backdrop_get_form('search_block_form');
+  $form['search_block_form']['#attributes']['placeholder'] = $settings['search_placeholder'];
+  $form['actions']['submit']['#value'] = '';
+  $form['actions']['submit']['#title'] = $settings['search_button_label'];
+  $form['actions']['submit']['#attributes']['aria-label'] = $settings['search_button_label'];
+  $form['actions']['submit']['#attributes']['class'][] = 'combined-menu__search-button';
+  return $form;
+}
+
+/**
+ * Returns available menus.
+ *
+ * @return array
+ *   Menu names keyed by machine name.
+ */
+function combined_menu_menu_options() {
+  if (module_exists('menu')) {
+    return menu_get_menus();
+  }
+  return menu_list_system_menus();
+}
+
+/**
+ * Adjusts state selectors in a core menu form fragment.
+ *
+ * @param array $states
+ *   Form API states.
+ * @param string $prefix
+ *   The settings prefix.
+ *
+ * @return array
+ *   Adjusted states.
+ */
+function combined_menu_namespace_states(array $states, $prefix) {
+  foreach ($states as $state => $conditions) {
+    foreach ($conditions as $selector => $condition) {
+      $new_selector = str_replace(
+        'block_settings[',
+        'block_settings[' . $prefix,
+        $selector
+      );
+      $states[$state][$new_selector] = $condition;
+      if ($new_selector !== $selector) {
+        unset($states[$state][$selector]);
+      }
+    }
+  }
+  return $states;
+}
