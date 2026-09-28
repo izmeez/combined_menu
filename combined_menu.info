@@ -1,5 +1,5 @@
 name = Combined Menu
-description = Provides a configurable block that combines primary navigation, account navigation, and an optional search form.
+description = Provides a configurable block that combines account and primary menus with an optional search form.
 backdrop = 1.x
 type = module
 package = Navigation

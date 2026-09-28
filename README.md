@@ -1,5 +1,7 @@
-Combined Menu
-=============
+# Combined Menu
+
+**IMPORTANT: This module is not ready for use.**
+**Just a sandbox project for now.**
 
 Provides one block containing a search box, an account menu, and a primary menu,
 for placement in a theme's header region in place of separate primary and
