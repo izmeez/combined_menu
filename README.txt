@@ -1,6 +1,8 @@
 Combined Menu
 =============
 
+** IMPORTANT: This module is not ready for use. **
+
 Provides one block containing, in source order:
 
 1. Search (optional).
