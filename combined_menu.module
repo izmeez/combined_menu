@@ -1,7 +1,16 @@
 <?php
 /**
  * @file
- * Provides a combined navigation block.
+ * Provides a combined navigation block: search, account menu, and primary
+ * menu in one block, for placement in a theme's header region in place of
+ * separate primary/account menu blocks.
+ *
+ * Desktop and mobile are both governed by this module and its
+ * combined_menu.css. That stylesheet is deliberately low-specificity
+ * (flat class selectors, no IDs, no !important) so a theme can copy it
+ * and override freely, or a site can target the same classes with
+ * CSS Injector. See combined_menu.css for the full list of override
+ * points and combined_menu.info for the classes each region carries.
  */
 
 /**
@@ -26,78 +35,66 @@ function combined_menu_block_configure($delta = '', $settings = array()) {
   $form['primary'] = array(
     '#type' => 'fieldset',
     '#title' => t('Primary menu'),
+    '#description' => t('Always included in both the desktop and mobile layouts.'),
   );
   $form['primary']['primary_menu'] = array(
     '#type' => 'select',
     '#title' => t('Menu'),
     '#options' => combined_menu_menu_options(),
     '#default_value' => $settings['primary_menu'],
+    '#parents' => array('block_settings', 'primary_menu'),
   );
   $form['primary'] += combined_menu_menu_form($settings, 'primary');
 
   $form['account'] = array(
     '#type' => 'fieldset',
     '#title' => t('Account menu'),
+    '#description' => t('Always included in both the desktop and mobile layouts.'),
   );
   $form['account']['account_menu'] = array(
     '#type' => 'select',
     '#title' => t('Menu'),
     '#options' => combined_menu_menu_options(),
     '#default_value' => $settings['account_menu'],
+    '#parents' => array('block_settings', 'account_menu'),
   );
   $form['account'] += combined_menu_menu_form($settings, 'account');
-
-  $form['navigation'] = array(
-    '#type' => 'fieldset',
-    '#title' => t('Combined navigation'),
-  );
-  $form['navigation']['toggle'] = array(
-    '#type' => 'checkbox',
-    '#title' => t('Display menu toggle button on small screens'),
-    '#default_value' => $settings['toggle'],
-    '#description' => t('On small screens, the combined search, account, and primary navigation is hidden behind one menu toggle.'),
-  );
-  $form['navigation']['toggle_text'] = array(
-    '#type' => 'textfield',
-    '#title' => t('Toggle button text'),
-    '#default_value' => $settings['toggle_text'],
-    '#description' => t('Text displayed beside the hamburger button.'),
-    '#states' => array(
-      'visible' => array(
-        'input[name="block_settings[toggle]"]' => array('checked' => TRUE),
-      ),
-    ),
-  );
 
   $form['search'] = array(
     '#type' => 'fieldset',
     '#title' => t('Search'),
   );
-  $form['search']['search_enabled'] = array(
+  $form['search']['search_show_desktop'] = array(
     '#type' => 'checkbox',
-    '#title' => t('Show search'),
-    '#default_value' => $settings['search_enabled'],
+    '#title' => t('Show on desktop'),
+    '#default_value' => $settings['search_show_desktop'],
+  );
+  $form['search']['search_show_mobile'] = array(
+    '#type' => 'checkbox',
+    '#title' => t('Show on mobile'),
+    '#default_value' => $settings['search_show_mobile'],
   );
   $form['search']['search_placeholder'] = array(
     '#type' => 'textfield',
     '#title' => t('Search field placeholder'),
     '#default_value' => $settings['search_placeholder'],
-    '#states' => array(
-      'visible' => array(
-        'input[name="block_settings[search_enabled]"]' => array('checked' => TRUE),
-      ),
-    ),
   );
   $form['search']['search_button_label'] = array(
     '#type' => 'textfield',
     '#title' => t('Search button label'),
     '#default_value' => $settings['search_button_label'],
-    '#description' => t('Accessible text for the search button.'),
-    '#states' => array(
-      'visible' => array(
-        'input[name="block_settings[search_enabled]"]' => array('checked' => TRUE),
-      ),
-    ),
+    '#description' => t('Accessible text for the search button; the button itself displays an icon only.'),
+  );
+
+  $form['mobile'] = array(
+    '#type' => 'fieldset',
+    '#title' => t('Mobile toggle'),
+  );
+  $form['mobile']['toggle_text'] = array(
+    '#type' => 'textfield',
+    '#title' => t('Toggle button text'),
+    '#default_value' => $settings['toggle_text'],
+    '#description' => t('Text displayed beside the hamburger icon. The toggle is hidden automatically if nothing would be visible on mobile.'),
   );
 
   return $form;
@@ -105,6 +102,20 @@ function combined_menu_block_configure($delta = '', $settings = array()) {
 
 /**
  * Implements hook_block_view().
+ *
+ * Renders two parallel structures from the same configured content:
+ * a desktop navigation (.combined-menu--desktop) and a mobile
+ * navigation behind one toggle (.combined-menu--mobile). Account and
+ * primary always appear in both. Search appears in each according to
+ * its own show_desktop / show_mobile settings — independent visibility
+ * per breakpoint isn't achievable from a single DOM node with CSS alone,
+ * so search is built once per context from combined_menu_search(),
+ * which is safe to call twice (each call gets a fresh form build id).
+ *
+ * combined_menu.css governs layout for both structures; neither
+ * structure styles menu item internals beyond what's needed to
+ * establish the row/stack shape described in the module's file
+ * comment and in combined_menu.css itself.
  */
 function combined_menu_block_view($delta = '', $settings = array(), $contexts = array()) {
   module_load_include('inc', 'system', 'system.menu');
@@ -113,71 +124,184 @@ function combined_menu_block_view($delta = '', $settings = array(), $contexts = 
   $block = array();
   $block['subject'] = '';
 
-  $navigation = array(
-    '#type' => 'container',
-    '#attributes' => array(
-      'class' => array('menu', 'combined-menu__navigation'),
-    ),
-  );
-
-  if (!empty($settings['search_enabled'])) {
-    $navigation['search'] = array(
-      '#type' => 'container',
-      '#attributes' => array(
-        'class' => array('combined-menu__search'),
-      ),
-      'content' => combined_menu_search($settings),
-    );
-  }
-
   $account = combined_menu_build_menu($settings, 'account');
-  if (!empty($account['content'])) {
-    $navigation['account'] = array(
-      '#type' => 'container',
-      '#attributes' => array(
-        'class' => array('combined-menu__account'),
-      ),
-      'content' => $account['content'],
-    );
-  }
-
   $primary = combined_menu_build_menu($settings, 'primary');
-  if (!empty($primary['content'])) {
-    $navigation['primary'] = array(
-      '#type' => 'container',
-      '#attributes' => array(
-        'class' => array('combined-menu__primary'),
-      ),
-      'content' => $primary['content'],
-    );
+  $has_account = !empty($account['content']);
+  $has_primary = !empty($primary['content']);
+
+  if (!$has_account && !$has_primary && empty($settings['search_show_desktop']) && empty($settings['search_show_mobile'])) {
+    return $block;
   }
 
   $content = array(
     '#type' => 'container',
     '#attributes' => array(
-      'class' => array('combined-menu'),
+      'class' => array('combined-menu', 'navbar'),
+    ),
+    '#attached' => array(
+      'css' => array(
+        backdrop_get_path('module', 'combined_menu') . '/css/combined_menu.css',
+      ),
     ),
   );
 
-  if (!empty($settings['toggle'])) {
+  // --- Desktop structure. Always present in markup; combined_menu.css
+  // hides it below the 48em breakpoint. No toggle wraps this — it is
+  // not behind a checkbox, unlike the mobile structure below.
+  //
+  // .combined-menu__top groups search + account so the "together no
+  // more than 1/3 width" requirement can be a single width cap on one
+  // real element, rather than simulated across two independently
+  // floated siblings (which cannot reliably sum to a shared cap with
+  // CSS floats alone). ---
+  $desktop = array(
+    '#type' => 'container',
+    '#attributes' => array(
+      'class' => array('combined-menu--desktop'),
+    ),
+  );
+  $top = array(
+    '#type' => 'container',
+    '#attributes' => array(
+      'class' => array('combined-menu__top'),
+    ),
+  );
+  $top_has_content = FALSE;
+  if (!empty($settings['search_show_desktop'])) {
+    $top['search'] = combined_menu_search_wrapper($settings, 'desktop');
+    $top_has_content = TRUE;
+  }
+  if ($has_account) {
+    $top['account'] = combined_menu_menu_wrapper($account, 'account');
+    $top_has_content = TRUE;
+  }
+  if ($top_has_content) {
+    $desktop['top'] = $top;
+  }
+  if ($has_primary) {
+    $desktop['primary'] = combined_menu_menu_wrapper($primary, 'primary');
+  }
+  $content['desktop'] = $desktop;
+
+  // --- Mobile structure. Behind one checkbox toggle, built fresh per
+  // request from the same $settings so each context can independently
+  // show/hide search while account and primary are always present. ---
+  $mobile_has_content = $has_account || $has_primary || !empty($settings['search_show_mobile']);
+  if ($mobile_has_content) {
     $id = backdrop_html_id('combined-menu-toggle-state');
+    // No wrapping container here: core's hide/show CSS
+    // (.menu-toggle-state:not(:checked) ~ .menu) is a sibling-combinator
+    // selector that requires the checkbox and .combined-menu--mobile to
+    // be direct siblings under the same parent. Wrapping the checkbox in
+    // its own <div> (an earlier version of this file did, for a
+    // .combined-menu__toggle repositioning hook) breaks that sibling
+    // relationship and makes the toggle permanently inert — the menu can
+    // never be hidden because the selector never matches. Reposition the
+    // toggle by targeting core's own .menu-toggle-button class directly
+    // (documented in combined_menu.css) instead of adding a wrapper.
     $content['toggle'] = array(
       '#markup' => theme('menu_toggle', array(
         'enabled' => TRUE,
         'id' => $id,
-        'text' => t(trim($settings['toggle_text'])),
+        'text' => trim($settings['toggle_text']),
       )),
+      '#weight' => -1,
+      '#attached' => array(
+        'js' => array(
+          backdrop_get_path('module', 'combined_menu') . '/js/combined_menu.js',
+        ),
+      ),
     );
-    $navigation['#attached']['library'][] = array(
-      'system',
-      'backdrop.menu-toggle',
+
+    $mobile = array(
+      '#type' => 'container',
+      '#attributes' => array(
+        // .menu is required here, not decorative: core's own
+        // menu-toggle CSS (core/modules/system/css/menu-toggle.theme.css)
+        // hides/shows an element purely via the sibling selector
+        // `.menu-toggle-state:checked ~ .menu`. This class is what that
+        // selector matches on.
+        'class' => array('combined-menu--mobile', 'menu'),
+        'data-menu-toggle-id' => $id,
+      ),
+      '#attached' => array(
+        'library' => array(
+          array('system', 'backdrop.menu-toggle'),
+        ),
+      ),
     );
+    if (!empty($settings['search_show_mobile'])) {
+      $mobile['search'] = combined_menu_search_wrapper($settings, 'mobile');
+    }
+    if ($has_account) {
+      $account_mobile = combined_menu_build_menu($settings, 'account');
+      $mobile['account'] = combined_menu_menu_wrapper($account_mobile, 'account');
+    }
+    if ($has_primary) {
+      $primary_mobile = combined_menu_build_menu($settings, 'primary');
+      $mobile['primary'] = combined_menu_menu_wrapper($primary_mobile, 'primary');
+    }
+    $content['mobile'] = $mobile;
   }
 
-  $content['navigation'] = $navigation;
-  $content['#attached']['css'][] = backdrop_get_path('module', 'combined_menu') . '/css/combined_menu.css';
   $block['content'] = $content;
   return $block;
+}
+
+/**
+ * Wraps a built menu tree in its targetable container.
+ *
+ * @param array $menu
+ *   Return value of combined_menu_build_menu(): an array with 'content'.
+ * @param string $type
+ *   Either 'account' or 'primary'.
+ *
+ * @return array
+ *   A container render array. Carries combined-menu__<type> plus
+ *   additional alongside classes as extra override hooks — the
+ *   combined-menu__<type> class remains the primary targeting hook.
+ *   'nav' (Bootstrap vocabulary) is added for both types. 'header-menu'
+ *   is added for account only: it's a real, common Backdrop theme
+ *   convention (used by, e.g., Corporate KISS's own CSS for its
+ *   account/login menu specifically — confirmed by reading that
+ *   theme's source), not a generic nav convention, so it would be
+ *   wrong to also add it to primary.
+ */
+function combined_menu_menu_wrapper(array $menu, $type) {
+  $class = array('combined-menu__' . $type, 'nav');
+  if ($type === 'account') {
+    $class[] = 'header-menu';
+  }
+  return array(
+    '#type' => 'container',
+    '#attributes' => array(
+      'class' => $class,
+    ),
+    'content' => $menu['content'],
+  );
+}
+
+/**
+ * Wraps the search form in its targetable container.
+ *
+ * @param array $settings
+ *   The combined menu block settings.
+ * @param string $context
+ *   Either 'desktop' or 'mobile' — used only to keep the two build ids
+ *   distinct; the wrapper's classes are the same in both contexts so a
+ *   single CSS rule or override targets search everywhere it appears.
+ *
+ * @return array
+ *   A container render array.
+ */
+function combined_menu_search_wrapper(array $settings, $context) {
+  return array(
+    '#type' => 'container',
+    '#attributes' => array(
+      'class' => array('combined-menu__search'),
+    ),
+    'content' => combined_menu_search($settings, $context),
+  );
 }
 
 /**
@@ -193,7 +317,7 @@ function combined_menu_block_defaults() {
 
   return array(
     'primary_menu' => $primary['menu_name'],
-    'primary_style' => 'top_only',
+    'primary_style' => $primary['style'],
     'primary_level' => $primary['level'],
     'primary_depth' => $primary['depth'],
     'primary_expand_all' => $primary['expand_all'],
@@ -208,9 +332,9 @@ function combined_menu_block_defaults() {
     'account_clickdown' => $account['clickdown'],
     'account_collapse' => $account['collapse'],
     'account_accordion' => !empty($account['accordion']),
-    'toggle' => TRUE,
     'toggle_text' => 'Menu',
-    'search_enabled' => TRUE,
+    'search_show_desktop' => TRUE,
+    'search_show_mobile' => TRUE,
     'search_placeholder' => 'Enter search terms',
     'search_button_label' => 'Search',
   );
@@ -225,23 +349,21 @@ function combined_menu_block_defaults() {
  *   Either 'primary' or 'account'.
  *
  * @return array
- *   A menu configuration form fragment.
+ *   A menu configuration form fragment, with every element's #parents
+ *   namespaced to block_settings[<type>_<field>] so the primary and
+ *   account forms don't collide when merged into one settings form.
  */
 function combined_menu_menu_form(array $settings, $type) {
   $prefix = $type . '_';
-  $config = array(
-    'menu_name' => $settings[$prefix . 'menu'],
-    'style' => $settings[$prefix . 'style'],
-    'level' => $settings[$prefix . 'level'],
-    'depth' => $settings[$prefix . 'depth'],
-    'expand_all' => $settings[$prefix . 'expand_all'],
-    'toggle' => FALSE,
-    'toggle_text' => 'Menu',
-    'clickdown' => $settings[$prefix . 'clickdown'],
-    'collapse' => $settings[$prefix . 'collapse'],
-    'accordion' => $settings[$prefix . 'accordion'],
-  );
+  $config = combined_menu_menu_config($settings, $type);
   $form = system_menu_block_form($config);
+  // menu_name is configured via the separate <type>_menu select added in
+  // combined_menu_block_configure(). toggle / toggle_text are removed
+  // entirely: this module always builds account/primary with
+  // 'toggle' => FALSE (see combined_menu_menu_config()) and supplies its
+  // own single combined toggle instead, so these two fields from core's
+  // form would save a value that is silently never used — confusing and
+  // inert, not a real setting.
   unset($form['menu_name'], $form['toggle'], $form['toggle_text']);
 
   foreach ($form as $key => &$element) {
@@ -255,7 +377,15 @@ function combined_menu_menu_form(array $settings, $type) {
 }
 
 /**
- * Builds one of the configured menu trees without its own toggle.
+ * Builds one of the configured menu trees, without its own toggle.
+ *
+ * Core's own menu style setting (system_menu_block_form()'s 'style'
+ * field, already exposed in this block's configuration form) decides
+ * whether the tree includes submenus at all. When 'tree' is selected,
+ * core outputs nested <ul> markup for child links; combined_menu.css
+ * styles that nested markup as a dropdown at desktop width. No
+ * dropdown-specific markup is generated by this module — it is exactly
+ * what system_menu_block_build() would output for a normal menu block.
  *
  * @param array $settings
  *   The combined menu block settings.
@@ -263,41 +393,84 @@ function combined_menu_menu_form(array $settings, $type) {
  *   Either 'primary' or 'account'.
  *
  * @return array
- *   The menu block data.
+ *   The menu block data, as returned by system_menu_block_build(): an
+ *   array with 'content' (renderable array) and 'subject' keys.
  */
 function combined_menu_build_menu(array $settings, $type) {
+  $config = combined_menu_menu_config($settings, $type);
+  return system_menu_block_build($config);
+}
+
+/**
+ * Builds the shared $config array used for both the form and the build.
+ *
+ * @param array $settings
+ *   The combined menu block settings.
+ * @param string $type
+ *   Either 'primary' or 'account'.
+ *
+ * @return array
+ *   A $config array in the shape system_menu_block_form() and
+ *   system_menu_block_build() expect.
+ */
+function combined_menu_menu_config(array $settings, $type) {
   $prefix = $type . '_';
-  $config = array(
+  return array(
     'menu_name' => $settings[$prefix . 'menu'],
     'style' => $settings[$prefix . 'style'],
     'level' => $settings[$prefix . 'level'],
     'depth' => $settings[$prefix . 'depth'],
     'expand_all' => $settings[$prefix . 'expand_all'],
-    'toggle' => FALSE,
-    'toggle_text' => 'Menu',
     'clickdown' => $settings[$prefix . 'clickdown'],
     'collapse' => $settings[$prefix . 'collapse'],
     'accordion' => $settings[$prefix . 'accordion'],
+    // Explicitly FALSE. system_menu_block_build() injects its own
+    // theme('menu_toggle', ...) #prefix onto the tree whenever 'toggle'
+    // is truthy, and falls back to core's own per-menu default (TRUE for
+    // main-menu) when this key is missing entirely, which would produce
+    // a second, independent hamburger toggle nested inside this block's
+    // own single toggle. This module supplies exactly one mobile toggle
+    // for the whole combined block, built in combined_menu_block_view().
+    'toggle' => FALSE,
+    'toggle_text' => '',
   );
-  return system_menu_block_build($config);
 }
 
 /**
  * Builds the core search block form for the combined menu.
  *
+ * Renders as one continuous-looking control: input and an icon-only
+ * submit button flush together with no gap, matching height via a
+ * shared explicit box model (see combined_menu.css) rather than flex
+ * stretch tricks, which proved fragile across different themes' own
+ * input styling in earlier iterations of this file.
+ *
  * @param array $settings
  *   The combined menu block settings.
+ * @param string $context
+ *   Either 'desktop' or 'mobile'. Not otherwise used by this function;
+ *   kept in the signature so call sites document which copy they are
+ *   building, since the same form is built once per context whenever
+ *   both are enabled.
  *
  * @return array
  *   A search form render array.
  */
-function combined_menu_search(array $settings) {
+function combined_menu_search(array $settings, $context) {
   $form = backdrop_get_form('search_block_form');
   $form['search_block_form']['#attributes']['placeholder'] = $settings['search_placeholder'];
   $form['actions']['submit']['#value'] = '';
   $form['actions']['submit']['#title'] = $settings['search_button_label'];
   $form['actions']['submit']['#attributes']['aria-label'] = $settings['search_button_label'];
   $form['actions']['submit']['#attributes']['class'][] = 'combined-menu__search-button';
+  // The icon is a sibling <span> after the submit button (#suffix), not
+  // a child of it — <input type="submit"> cannot contain child elements
+  // at all. Uses Backdrop core's own search icon
+  // (core/misc/icons/magnifying-glass.svg) for visual consistency with
+  // core/theme iconography. fill="currentColor" lets
+  // combined_menu.css's .combined-menu__search-icon { color: ... }
+  // control the icon color.
+  $form['actions']['submit']['#suffix'] = '<span class="combined-menu__search-icon" aria-hidden="true"><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 256 256" fill="currentColor"><path d="M229.66,218.34l-50.07-50.06a88.11,88.11,0,1,0-11.31,11.31l50.06,50.07a8,8,0,0,0,11.32-11.32ZM40,112a72,72,0,1,1,72,72A72.08,72.08,0,0,1,40,112Z"></path></svg></span>';
   return $form;
 }
 

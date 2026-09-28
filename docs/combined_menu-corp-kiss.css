@@ -2,6 +2,48 @@
  * @file
  * Layout for the Combined menu block — governs both desktop and mobile.
  *
+ * THIS FILE IS A THEME OVERRIDE, FOR THE CORPORATE KISS THEME
+ * ============================================================
+ * This is a complete copy of combined_menu's own css/combined_menu.css
+ * (from the combined_menu module), with Corporate KISS-specific
+ * additions merged in — search for "CORPORATE KISS ADDITIONS" below.
+ *
+ * Backdrop replaces a module's CSS file with a theme's file of the
+ * SAME FILENAME automatically (core/includes/common.inc,
+ * backdrop_get_css(): "Themes may replace module-defined CSS files by
+ * adding a stylesheet with the same filename... This allows themes to
+ * override complete CSS files, rather than specific selectors, when
+ * necessary."). That means:
+ *
+ * INSTALLATION
+ * 1. Save this file as css/combined_menu.css inside the corporate_kiss
+ *    theme directory (or a sub-theme's directory — the theme's own
+ *    README recommends sub-theming for anything beyond a one-off
+ *    tweak — the same steps apply there instead of editing the parent
+ *    theme directly).
+ * 2. Add ONE line to corporate_kiss.info (or the sub-theme's .info):
+ *
+ *      stylesheets[all][] = css/combined_menu.css
+ *
+ *    Because the filename (combined_menu.css) matches the module's own
+ *    file exactly, Backdrop swaps this file in for that one — the
+ *    module's original css/combined_menu.css does NOT also load. There
+ *    is only ever one combined_menu.css active on the page, not two.
+ *    (An earlier draft of Corporate KISS compatibility CSS used a
+ *    different filename, combined-menu-corporate-kiss.css, meant to
+ *    load ALONGSIDE the module's file as an addition — that is a valid
+ *    alternate approach, but is a different file from this one and the
+ *    two should not be confused: loading ONLY that small file, without
+ *    either this one or the module's original, leaves the icon/button/
+ *    layout rules entirely missing, since that file never contained
+ *    them.)
+ * 3. Clear the site's cache (admin/config/development/performance) so
+ *    Backdrop picks up the new .info declaration.
+ *
+ * Since this file fully replaces the module's, any future update to
+ * combined_menu's own css/combined_menu.css will NOT automatically
+ * reach this copy — re-merge changes by hand if the module is updated.
+ *
  * OVERRIDE POINTS
  * This file is meant to be copied into a theme and edited, or targeted
  * with CSS Injector. Every selector below is a flat class selector (no
@@ -21,7 +63,9 @@
  *                               elements, built again for this context)
  *   .combined-menu__search     search form wrapper — appears once per
  *                               context in which it is enabled
- *   .combined-menu__account    account menu wrapper (also carries .nav)
+ *   .combined-menu__account    account menu wrapper (also carries .nav
+ *                               and, in the module itself, .header-menu
+ *                               — a real Corporate KISS convention)
  *   .combined-menu__primary    primary menu wrapper (also carries .nav)
  *
  * The mobile hamburger is core's own unmodified .menu-toggle-button /
@@ -67,8 +111,9 @@
  * float left with nothing after it to clear them. Without this, a
  * combined_menu block placed in the same region as branding, after it
  * in block order, can still render alongside it rather than below it,
- * since block order alone doesn't control float behavior. Harmless
- * when nothing precedes it needs clearing.
+ * since block order alone doesn't control float behavior. Confirmed
+ * against Corporate KISS specifically: its .logo and .name-and-slogan
+ * rules (css/style.css) float left with no clearing rule after them.
  */
 .combined-menu {
   position: relative;
@@ -207,12 +252,69 @@
     display: none;
   }
 
+  /**
+   * CORPORATE KISS: HAMBURGER BESIDE BRANDING
+   * Places the toggle button at the right edge, level with the
+   * branding row, while the menu panel itself still opens below the
+   * branding in normal flow. Only the button (a <label>) is moved; the
+   * checkbox and .combined-menu--mobile stay direct siblings, so
+   * core's hide/show mechanism is untouched.
+   *
+   * .combined-menu is position: relative (base rules), so the button
+   * anchors to it. .combined-menu starts BELOW the branding on mobile,
+   * so a negative top pulls the button up into the branding row.
+   *
+   * TUNING: top: -3.5rem is an estimate, and like the desktop shift-up
+   * offset it is a fixed guess that does not track branding's height.
+   * Re-tune by hand if the logo, site name, or slogan change: make it
+   * more negative to move the button up, less negative to move it
+   * down. The slogan may wrap to more lines on very narrow screens,
+   * so check at a few narrow widths.
+   */
+  .combined-menu > .menu-toggle-button {
+    position: absolute;
+    top: -3.5rem;
+    right: 0.75rem;
+    z-index: 10;
+  }
+
   .combined-menu--mobile .combined-menu__search,
   .combined-menu--mobile .combined-menu__account,
   .combined-menu--mobile .combined-menu__primary {
     display: block;
     width: auto;
     margin: 0;
+  }
+
+  /**
+   * CORPORATE KISS: .combined-menu__account also carries the
+   * .header-menu class (added in the .module file for desktop benefit
+   * — Corporate KISS styles .header-menu with float: right, and
+   * .header-menu li with float: left, for its own account/login menu).
+   * Neither rule has a media query of its own in Corporate KISS's
+   * css/style.css, so both were also applying at mobile width: the
+   * outer float: right pushed the whole account menu to the right
+   * edge, and — once that outer float was reset below — the inner
+   * float: left on each <li> would otherwise still leave them
+   * side-by-side but not properly laid out as a clean row once
+   * float context changes. Both are reset here, mobile-only, and
+   * replaced with flex, which keeps the links in one inline row
+   * (not the outer-right position, and not stacked like primary)
+   * without depending on float at all.
+   */
+  .combined-menu--mobile .combined-menu__account {
+    float: none;
+  }
+
+  .combined-menu--mobile .combined-menu__account .menu {
+    display: flex;
+    flex-flow: row wrap;
+    align-items: center;
+  }
+
+  .combined-menu--mobile .combined-menu__account .menu li {
+    float: none;
+    margin-right: 1em;
   }
 
   /**
@@ -427,4 +529,127 @@
     display: block;
     white-space: nowrap;
   }
+
+  /**
+   * ===================================================================
+   * CORPORATE KISS: SHIFT UP BESIDE BRANDING
+   * ===================================================================
+   * Pulls ONLY the search+account row upward so it appears visually
+   * beside Corporate KISS's branding (logo, site name, slogan), while
+   * the primary menu row stays in its normal position below. This only
+   * affects desktop width — the mobile layout is unaffected (this rule
+   * lives inside the same min-width: 48em media query as everything
+   * else in this section).
+   *
+   * The negative margin is applied to .combined-menu__top specifically,
+   * NOT to the shared parent .combined-menu. An earlier version of this
+   * rule targeted .combined-menu itself — but .combined-menu__top and
+   * .combined-menu__primary are both children of that same parent, so
+   * shifting the parent moved both rows together as one rigid unit
+   * (confirmed directly: at every margin value tested, both rows moved
+   * in unison — search+account never separated from primary). Since
+   * .combined-menu__top is floated, a margin on it moves only itself;
+   * .combined-menu__primary, a separate sibling with its own clear:
+   * both (already present in this file's base rules), is unaffected
+   * and stays in normal flow below.
+   *
+   * TUNING: -140px is an estimate based on Corporate KISS's branding
+   * height (.logo img max-height: 125px, plus margins — see that
+   * theme's css/style.css) with this site's current logo, site name
+   * length, and slogan length. This value is NOT self-adjusting: if
+   * the logo image, site name text, or slogan text changes such that
+   * branding's rendered height changes, this number will need to be
+   * re-tuned by hand (increase the negative value if search+account
+   * ends up overlapping the logo; decrease it — a smaller negative
+   * number — if a gap appears between branding and search+account).
+   * There is no way to make this offset track branding's actual height
+   * automatically without deeper structural changes (see the chat
+   * discussion of the position: absolute alternative, which trades
+   * this fixed-guess problem for a different one).
+   */
+  .combined-menu__top {
+    margin-top: -140px;
+  }
+
+  /**
+   * .combined-menu--desktop's overflow: hidden (this file's base
+   * rules, used as a clearfix for the floated .combined-menu__top)
+   * clips the upward-shifted portion of .combined-menu__top above — a
+   * negative margin pulls it visually outside its parent's box, and
+   * overflow: hidden clips exactly that. Overridden to visible here so
+   * the shift is actually seen rather than cut off at
+   * .combined-menu--desktop's own top edge. .combined-menu__primary's
+   * own clear: both (this file's base rules) still independently
+   * ensures the next row drops below the float, so nothing depended on
+   * this clearfix for that.
+   */
+  .combined-menu--desktop {
+    overflow: visible;
+  }
+
+  /**
+   * ===================================================================
+   * CORPORATE KISS ADDITIONS
+   * ===================================================================
+   * Everything from here to the end of this media query ports Corporate
+   * KISS's own main-menu bar styling (see that theme's own
+   * css/main-menu.css) onto .combined-menu__primary. Corporate KISS
+   * scopes its styling to .block-system-main-menu — the core Main Menu
+   * block specifically — with no generic class fallback, so
+   * combined_menu's own primary menu (a different block) picks up none
+   * of it without this addition.
+   */
+
+  /* Style the menu bar itself — same values as Corporate KISS's
+   * .block-system-main-menu rule in css/main-menu.css. */
+  .combined-menu--desktop .combined-menu__primary {
+    background: #ededed;
+    border-radius: 4px;
+    box-shadow: 2px 3px 6px #999;
+    margin-bottom: 28px;
+    padding: 0 0.5em;
+  }
+
+  /* Top-level link styling — same values as Corporate KISS's
+   * ul.menu a rule. */
+  .combined-menu--desktop .combined-menu__primary .menu > li > a {
+    font-size: 1.2rem;
+    font-weight: bold;
+    line-height: 2em;
+    padding-right: 1em;
+    padding-left: 0.7em;
+    color: black;
+  }
+
+  /* Hover state — same values as Corporate KISS's ul.menu a:hover
+   * rule. */
+  .combined-menu--desktop .combined-menu__primary .menu > li > a:hover {
+    color: #796d4a;
+    border-bottom: 4px solid #93adc8;
+  }
+
+  /* Active link — same values as Corporate KISS's ul.menu a.active
+   * rule. */
+  .combined-menu--desktop .combined-menu__primary .menu > li > a.active {
+    border-bottom: 4px solid #81befd;
+    color: #796d4a;
+  }
+
+  /* Dropdown submenu width/background — same intent as Corporate
+   * KISS's ul.menu li ul rules, retargeted to combined_menu's own
+   * hover/focus-within dropdown selectors above (combined_menu does
+   * not use Corporate KISS's/Basis's .menu-dropdown JS-driven dropdown
+   * markup — it generates a plain nested <ul>, shown via
+   * :hover/:focus-within, styled earlier in this same media query). */
+  .combined-menu--desktop .combined-menu__primary .menu > li.has-children > ul,
+  .combined-menu--desktop .combined-menu__primary .menu > li.expanded > ul {
+    min-width: 5em;
+    background: #ededed;
+    box-shadow: 2px 3px 6px #999;
+  }
+
+  .combined-menu--desktop .combined-menu__primary .menu ul li > a {
+    line-height: 1.8em;
+  }
 }
+
